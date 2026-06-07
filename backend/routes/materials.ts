@@ -18,6 +18,17 @@ router.post('/projects/:projectId/materials', (req, res) => {
   res.json(item)
 })
 
+router.put('/materials/:id', (req, res) => {
+  const { name, category, quantity, price, purchaseDate, storeName, location, notes } = req.body
+  db.prepare(`
+    UPDATE materials SET
+      name = ?, category = ?, quantity = ?, price = ?, purchase_date = ?, store_name = ?, location = ?, notes = ?
+    WHERE id = ?
+  `).run(name, category || '', quantity || '', price || 0, purchaseDate || null, storeName || '', location || '', notes || '', req.params.id)
+  const item = db.prepare('SELECT * FROM materials WHERE id = ?').get(req.params.id)
+  res.json(item)
+})
+
 router.delete('/materials/:id', (req, res) => {
   db.prepare('DELETE FROM materials WHERE id = ?').run(req.params.id)
   res.json({ ok: true })

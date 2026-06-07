@@ -1,19 +1,39 @@
-import { useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { useParams } from 'react-router-dom'
+import { ArrowLeft, Plus, Trash2, Edit2, X, Check } from 'lucide-react'
 import { useMaterials } from '@/hooks/useMaterials'
 import { formatDate, formatMoney } from '@/utils/format'
+import type { MaterialItem } from '@/types'
+
+const emptyForm = { name: '', category: '', quantity: '', price: '', purchaseDate: '', storeName: '', location: '', notes: '' }
+const categories = ['瓷砖', '地板', '涂料', '五金', '灯具', '洁具', '橱柜', '门窗', '其他']
 
 export default function Materials() {
   const { id } = useParams<{ id: string }>()
   const projectId = Number(id)
-  const { items, addItem, deleteItem } = useMaterials(projectId)
-  const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({
-    name: '', category: '', quantity: '', price: '', purchaseDate: '', storeName: '', location: '', notes: '',
-  })
+  const { items, addItem, updateItem, deleteItem } = useMaterials(projectId)
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [form, setForm] = useState(emptyForm)
+  const [editForm, setEditForm] = useState(emptyForm)
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const groupedItems = useMemo(() => {
+    const groups: Record<string, MaterialItem[]> = {}
+    items.forEach((item) => {
+      const key = item.purchaseDate || '未指定日期'
+      if (!groups[key]) groups[key] = []
+      groups[key].push(item)
+    })
+    return Object.entries(groups).sort((a, b) => {
+      if (a[0] === '未指定日期') return 1
+      if (b[0] === '未指定日期') return -1
+      return b[0].localeCompare(a[0])
+    })
+  }, [items])
+
+  const totalSpent = items.reduce((s, i) => s + i.price, 0)
+
+  const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     await addItem({
       name: form.name,
@@ -25,12 +45,71 @@ export default function Materials() {
       location: form.location,
       notes: form.notes,
     })
-    setForm({ name: '', category: '', quantity: '', price: '', purchaseDate: '', storeName: '', location: '', notes: '' })
-    setShowForm(false)
+    setForm(emptyForm)
+    setShowAddForm(false)
   }
 
-  const categories = ['瓷砖', '地板', '涂料', '五金', '灯具', '洁具', '橱柜', '门窗', '其他']
-  const totalSpent = items.reduce((s, i) => s + i.price, 0)
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingId) return
+    await updateItem(editingId, {
+      name: editForm.name,
+      category: editForm.category,
+      quantity: editForm.quantity,
+      price: Number(editForm.price),
+      purchaseDate: editForm.purchaseDate,
+      storeName: editForm.storeName,
+      location: editForm.location,
+      notes: editForm.notes,
+    })
+    setEditingId(null)
+    setEditForm(emptyForm)
+  }
+
+  const startEdit = (item: MaterialItem) => {
+    setEditingId(item.id)
+    setEditForm({
+      name: item.name,
+      category: item.category,
+      quantity: item.quantity,
+      price: String(item.price),
+      purchaseDate: item.purchaseDate,
+      storeName: item.storeName,
+      location: item.location,
+      notes: item.notes,
+    })
+  }
+
+  const cancelEdit = () => {
+    setEditingId(null)
+    setEditForm(emptyForm)
+  }
+
+  const renderForm = (formData: typeof emptyForm, setFormData: (f: typeof emptyForm) => void, onSubmit: (e: React.FormEvent) => void, onCancel: () => void, isEdit: boolean) => (
+    <form onSubmit={onSubmit} className="bg-white rounded-xl shadow p-4 mb-4 space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <input placeholder="材料名称" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="border rounded-lg px-3 py-2 text-sm" required />
+        <select value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })} className="border rounded-lg px-3 py-2 text-sm" required>
+          <option value="">选择分类</option>
+          {categories.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <input placeholder="数量/规格" value={formData.quantity} onChange={(e) => setFormData({ ...formData, quantity: e.target.value })} className="border rounded-lg px-3 py-2 text-sm" />
+        <input type="number" placeholder="价格" value={formData.price} onChange={(e) => setFormData({ ...formData, price: e.target.value })} className="border rounded-lg px-3 py-2 text-sm" required />
+        <input type="date" value={formData.purchaseDate} onChange={(e) => setFormData({ ...formData, purchaseDate: e.target.value })} className="border rounded-lg px-3 py-2 text-sm" />
+        <input placeholder="购买店铺" value={formData.storeName} onChange={(e) => setFormData({ ...formData, storeName: e.target.value })} className="border rounded-lg px-3 py-2 text-sm" />
+        <input placeholder="存放位置" value={formData.location} onChange={(e) => setFormData({ ...formData, location: e.target.value })} className="border rounded-lg px-3 py-2 text-sm" />
+      </div>
+      <textarea placeholder="备注" value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" />
+      <div className="flex gap-2">
+        <button type="submit" className="flex items-center gap-1 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm">
+          <Check size={14} /> {isEdit ? '保存修改' : '保存'}
+        </button>
+        <button type="button" onClick={onCancel} className="flex items-center gap-1 text-gray-500 px-4 py-2 text-sm">
+          <X size={14} /> 取消
+        </button>
+      </div>
+    </form>
+  )
 
   return (
     <div>
@@ -41,49 +120,54 @@ export default function Materials() {
 
       <div className="bg-white rounded-xl shadow p-4 mb-4 flex justify-between items-center">
         <span className="text-sm text-gray-600">共 {items.length} 项，已花费 {formatMoney(totalSpent)}</span>
-        <button onClick={() => setShowForm(true)} className="flex items-center gap-1 bg-blue-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-blue-700">
+        <button onClick={() => setShowAddForm(true)} className="flex items-center gap-1 bg-blue-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-blue-700">
           <Plus size={16} /> 添加材料
         </button>
       </div>
 
-      {showForm && (
-        <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow p-4 mb-6 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <input placeholder="材料名称" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="border rounded-lg px-3 py-2 text-sm" required />
-            <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="border rounded-lg px-3 py-2 text-sm" required>
-              <option value="">选择分类</option>
-              {categories.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <input placeholder="数量/规格" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} className="border rounded-lg px-3 py-2 text-sm" />
-            <input type="number" placeholder="价格" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="border rounded-lg px-3 py-2 text-sm" required />
-            <input type="date" value={form.purchaseDate} onChange={(e) => setForm({ ...form, purchaseDate: e.target.value })} className="border rounded-lg px-3 py-2 text-sm" />
-            <input placeholder="购买店铺" value={form.storeName} onChange={(e) => setForm({ ...form, storeName: e.target.value })} className="border rounded-lg px-3 py-2 text-sm" />
-            <input placeholder="存放位置" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} className="border rounded-lg px-3 py-2 text-sm" />
-          </div>
-          <textarea placeholder="备注" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" />
-          <div className="flex gap-2">
-            <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm">保存</button>
-            <button type="button" onClick={() => setShowForm(false)} className="text-gray-500 px-4 py-2 text-sm">取消</button>
-          </div>
-        </form>
-      )}
+      {showAddForm && renderForm(form, setForm, handleAddSubmit, () => setShowAddForm(false), false)}
 
-      <div className="space-y-3">
-        {items.map((item) => (
-          <div key={item.id} className="bg-white rounded-xl shadow p-4 flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-sm">{item.name}</span>
-                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{item.category}</span>
-              </div>
-              <div className="text-xs text-gray-500 mt-1">
-                {item.quantity} · {formatMoney(item.price)} · {item.storeName} · {item.location}
-              </div>
-              {item.notes && <div className="text-xs text-gray-400 mt-1">{item.notes}</div>}
+      <div className="space-y-6">
+        {groupedItems.map(([date, dateItems]) => (
+          <div key={date}>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="h-px bg-gray-200 flex-1" />
+              <span className="text-sm font-medium text-gray-500 px-2">
+                {date === '未指定日期' ? date : formatDate(date)}
+                <span className="text-gray-400 font-normal ml-1">({dateItems.length} 项)</span>
+              </span>
+              <div className="h-px bg-gray-200 flex-1" />
             </div>
-            <button onClick={() => deleteItem(item.id)} className="text-gray-400 hover:text-red-500">
-              <Trash2 size={16} />
-            </button>
+            <div className="space-y-3">
+              {dateItems.map((item) => (
+                <div key={item.id}>
+                  {editingId === item.id ? (
+                    renderForm(editForm, setEditForm, handleEditSubmit, cancelEdit, true)
+                  ) : (
+                    <div className="bg-white rounded-xl shadow p-4 flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-sm">{item.name}</span>
+                          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{item.category}</span>
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {item.quantity} · {formatMoney(item.price)} · {item.storeName} · {item.location}
+                        </div>
+                        {item.notes && <div className="text-xs text-gray-400 mt-1">{item.notes}</div>}
+                      </div>
+                      <div className="flex gap-1 ml-3">
+                        <button onClick={() => startEdit(item)} className="text-gray-400 hover:text-blue-500 p-1" title="编辑">
+                          <Edit2 size={16} />
+                        </button>
+                        <button onClick={() => deleteItem(item.id)} className="text-gray-400 hover:text-red-500 p-1" title="删除">
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         ))}
       </div>

@@ -20,10 +20,16 @@ export function useMaterials(projectId: number) {
     return res.data
   }, [projectId])
 
+  const updateItem = useCallback(async (id: number, data: Partial<MaterialItem>) => {
+    const res = await api.put(`/materials/${id}`, data)
+    setItems((prev) => prev.map((i) => (i.id === id ? res.data : i)))
+    return res.data
+  }, [])
+
   const deleteItem = useCallback(async (id: number) => {
     await api.delete(`/materials/${id}`)
     setItems((prev) => prev.filter((i) => i.id !== id))
   }, [])
 
-  return { items, fetchItems, addItem, deleteItem }
+  return { items, fetchItems, addItem, updateItem, deleteItem }
 }
