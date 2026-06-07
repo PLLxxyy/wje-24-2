@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { db } from '../database'
+import { toCamelCase, toCamelCaseArray } from '../utils'
 
 const router = Router()
 
@@ -15,7 +16,7 @@ router.get('/', (req: any, res) => {
     WHERE p.owner_id = ? OR pm.user_id = ?
     GROUP BY p.id
   `).all(userId, userId)
-  res.json(projects)
+  res.json(toCamelCaseArray(projects as Record<string, any>[]))
 })
 
 router.post('/', (req: any, res) => {
@@ -32,13 +33,13 @@ router.post('/', (req: any, res) => {
   })
 
   const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(projectId)
-  res.json(project)
+  res.json(toCamelCase(project as Record<string, any>))
 })
 
 router.get('/:id', (req: any, res) => {
   const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id)
   if (!project) return res.status(404).json({ error: '项目不存在' })
-  res.json(project)
+  res.json(toCamelCase(project as Record<string, any>))
 })
 
 router.delete('/:id', (req: any, res) => {
@@ -53,7 +54,7 @@ router.get('/:id/members', (req, res) => {
     JOIN users u ON pm.user_id = u.id
     WHERE pm.project_id = ?
   `).all(req.params.id)
-  res.json(members)
+  res.json(toCamelCaseArray(members as Record<string, any>[]))
 })
 
 router.post('/:id/members', (req, res) => {

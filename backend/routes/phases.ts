@@ -1,11 +1,12 @@
 import { Router } from 'express'
 import { db } from '../database'
+import { toCamelCase, toCamelCaseArray } from '../utils'
 
 const router = Router()
 
 router.get('/projects/:projectId/phases', (req, res) => {
   const phases = db.prepare('SELECT * FROM phases WHERE project_id = ? ORDER BY order_index').all(req.params.projectId)
-  res.json(phases)
+  res.json(toCamelCaseArray(phases as Record<string, any>[]))
 })
 
 router.patch('/phases/:id', (req, res) => {
@@ -19,12 +20,12 @@ router.patch('/phases/:id', (req, res) => {
   values.push(req.params.id)
   db.prepare(`UPDATE phases SET ${fields.join(', ')} WHERE id = ?`).run(...values)
   const phase = db.prepare('SELECT * FROM phases WHERE id = ?').get(req.params.id)
-  res.json(phase)
+  res.json(toCamelCase(phase as Record<string, any>))
 })
 
 router.get('/phases/:id/diary', (req, res) => {
   const entries = db.prepare('SELECT * FROM diary_entries WHERE phase_id = ? ORDER BY date DESC').all(req.params.id)
-  res.json(entries.map((e: any) => ({ ...e, photos: JSON.parse(e.photos || '[]') })))
+  res.json(toCamelCaseArray(entries as Record<string, any>[]).map((e: any) => ({ ...e, photos: JSON.parse(e.photos || '[]') })))
 })
 
 router.post('/phases/:id/diary', (req, res) => {
@@ -32,7 +33,8 @@ router.post('/phases/:id/diary', (req, res) => {
   const result = db.prepare('INSERT INTO diary_entries (phase_id, date, content, photos) VALUES (?, ?, ?, ?)')
     .run(req.params.id, date, content, JSON.stringify(photos || []))
   const entry = db.prepare('SELECT * FROM diary_entries WHERE id = ?').get(result.lastInsertRowid)
-  res.json({ ...(entry as any), photos: JSON.parse((entry as any).photos || '[]') })
+  const camelEntry = toCamelCase(entry as Record<string, any>)
+  res.json({ ...camelEntry, photos: JSON.parse((camelEntry as any).photos || '[]') })
 })
 
 export default router

@@ -2,6 +2,7 @@ import { Router } from 'express'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { db } from '../database'
+import { toCamelCase } from '../utils'
 
 const router = Router()
 const JWT_SECRET = process.env.JWT_SECRET || 'pdd170-secret'
@@ -29,7 +30,8 @@ router.post('/login', (req, res) => {
     return res.status(401).json({ error: '用户名或密码错误' })
   }
   const token = jwt.sign({ userId: user.id }, JWT_SECRET)
-  res.json({ id: user.id, username: user.username, displayName: user.display_name, token })
+  const camelUser = toCamelCase(user)
+  res.json({ ...camelUser, token })
 })
 
 router.get('/me', (req, res) => {
@@ -39,7 +41,8 @@ router.get('/me', (req, res) => {
     const decoded = jwt.verify(auth.slice(7), JWT_SECRET) as any
     const user = db.prepare('SELECT id, username, display_name FROM users WHERE id = ?').get(decoded.userId) as any
     if (!user) return res.status(401).json({ error: '用户不存在' })
-    res.json({ id: user.id, username: user.username, displayName: user.display_name, token: auth.slice(7) })
+    const camelUser = toCamelCase(user)
+    res.json({ ...camelUser, token: auth.slice(7) })
   } catch {
     res.status(401).json({ error: 'token 无效' })
   }

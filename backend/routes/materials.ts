@@ -1,11 +1,12 @@
 import { Router } from 'express'
 import { db } from '../database'
+import { toCamelCase, toCamelCaseArray } from '../utils'
 
 const router = Router()
 
 router.get('/projects/:projectId/materials', (req, res) => {
   const items = db.prepare('SELECT * FROM materials WHERE project_id = ? ORDER BY purchase_date DESC').all(req.params.projectId)
-  res.json(items)
+  res.json(toCamelCaseArray(items as Record<string, any>[]))
 })
 
 router.post('/projects/:projectId/materials', (req, res) => {
@@ -15,7 +16,7 @@ router.post('/projects/:projectId/materials', (req, res) => {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(req.params.projectId, name, category || '', quantity || '', price || 0, purchaseDate || null, storeName || '', location || '', notes || '')
   const item = db.prepare('SELECT * FROM materials WHERE id = ?').get(result.lastInsertRowid)
-  res.json(item)
+  res.json(toCamelCase(item as Record<string, any>))
 })
 
 router.put('/materials/:id', (req, res) => {
@@ -26,7 +27,7 @@ router.put('/materials/:id', (req, res) => {
     WHERE id = ?
   `).run(name, category || '', quantity || '', price || 0, purchaseDate || null, storeName || '', location || '', notes || '', req.params.id)
   const item = db.prepare('SELECT * FROM materials WHERE id = ?').get(req.params.id)
-  res.json(item)
+  res.json(toCamelCase(item as Record<string, any>))
 })
 
 router.delete('/materials/:id', (req, res) => {
